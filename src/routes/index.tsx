@@ -1,24 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Menu, Eye, EyeOff, Plus, WifiOff, Tractor } from "lucide-react";
-import { Ledger } from "@/components/Ledger";
+import { Menu, WifiOff, Tractor, ArrowRight } from "lucide-react";
 import { SettingsSheet, currencyLabel, type Currency, type Farm } from "@/components/SettingsSheet";
-import { QuickAddSheet } from "@/components/QuickAddSheet";
 import { AiAdvisor } from "@/components/AiAdvisor";
 import { Medicines } from "@/components/Medicines";
 import { Flocks } from "@/components/Flocks";
+import { TraderLedger } from "@/components/TraderLedger";
 import { Paywall, useSubscription } from "@/components/Subscription";
-import { DailyAlertBanner } from "@/components/DailyAlert";
 import { MyFarmsSheet } from "@/components/MyFarms";
-import { WeatherWidget } from "@/components/WeatherWidget";
-import { PoultryCards, EggSalesPage, FeedLogPage } from "@/components/PoultryModules";
 import { WelcomeScreen, FarmsScreen } from "@/components/FarmsHome";
 import { usePersistentState, useOnline } from "@/lib/persist";
 import { registerOfflineSupport } from "@/lib/offline";
-import { useWeather } from "@/lib/weather";
 import { translator, type Lang } from "@/lib/i18n";
 import { farmTypeOf, tabsFor, type FarmKind } from "@/lib/farm";
-import { weatherAlert } from "@/lib/tips";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -27,12 +21,12 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "AgriPulse تطبيق عربي لإدارة مزارع الدواجن: كشف حساب، متابعة الأفواج، الأدوية، والمستشار الذكي — يعمل بدون إنترنت.",
+          "AgriPulse تطبيق عربي لإدارة مزارع الدواجن: كشف حساب تراكمي لكل تاجر، متابعة الأفواج بالأشهر والأسابيع، الأدوية، والمستشار الذكي — يعمل بدون إنترنت.",
       },
       { property: "og:title", content: "AgriPulse | إدارة مزارع الدواجن" },
       {
         property: "og:description",
-        content: "أدر عدة مزارع دواجن بحسابات وأفواج وأدوية ومستشار ذكي بواجهة عربية.",
+        content: "أدر عدة مزارع دواجن بكشوفات حسابات تراكمية وأفواج وأدوية ومستشار ذكي.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -111,9 +105,9 @@ function App() {
   return (
     <main
       dir={lang === "ar" ? "rtl" : "ltr"}
-      className="min-h-screen bg-background font-display text-foreground"
+      className="min-h-dvh bg-background font-display text-foreground"
     >
-      <div className="mx-auto min-h-screen w-full max-w-md">
+      <div className="mx-auto min-h-dvh w-full max-w-md">
         {!welcomeSeen ? (
           <WelcomeScreen onStart={() => setWelcomeSeen(true)} />
         ) : active ? (
@@ -186,33 +180,20 @@ function Dashboard({
   const t = translator(lang);
   const subscription = useSubscription();
   const online = useOnline();
-  const { weather, cached } = useWeather(online);
   const [tab, setTab] = useState("ledger");
-  const [page, setPage] = useState<"home" | "eggs" | "feed">("home");
 
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [quickOpen, setQuickOpen] = useState(false);
   const [currency, setCurrency] = usePersistentState<Currency>("agripulse_currency", "syp");
   const [dark, setDark] = usePersistentState<boolean>("agripulse_dark", false);
   const [notifications, setNotifications] = usePersistentState("agripulse_notifications", {
     meds: true,
     ledger: true,
   });
-  const [hidden, setHidden] = useState(false);
-  const [income, setIncome] = usePersistentState<number>(`agripulse_income_${farm.id}`, 0);
-  const [expenses, setExpenses] = usePersistentState<number>(`agripulse_expenses_${farm.id}`, 0);
-  const [activity, setActivity] = usePersistentState<
-    { id: string; label: string; value: string }[]
-  >(`agripulse_activity_${farm.id}`, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
     return () => document.documentElement.classList.remove("dark");
   }, [dark]);
-
-  useEffect(() => {
-    setPage("home");
-  }, [tab]);
 
   const tabs = tabsFor();
   const symbol = currencyLabel[currency];
@@ -249,22 +230,6 @@ function Dashboard({
     window.location.reload();
   };
 
-  const handleQuickSave = (entry: { kind: "in" | "out" | "note"; amount: number; text: string }) => {
-    if (entry.kind === "in") setIncome((v) => v + entry.amount);
-    if (entry.kind === "out") setExpenses((v) => v + entry.amount);
-    setActivity((prev) => [
-      {
-        id: `a-${Date.now()}`,
-        label: entry.text || (entry.kind === "in" ? "إيراد" : "مصروف"),
-        value:
-          entry.kind === "note"
-            ? "ملاحظة"
-            : `${entry.kind === "in" ? "+" : "-"} ${entry.amount.toLocaleString("ar-EG")} ${symbol}`,
-      },
-      ...prev,
-    ]);
-  };
-
   const requestDeleteFarm = () => {
     const ok = window.confirm(`سيتم حذف مزرعة «${farm.name}» من هذا الجهاز. متابعة؟`);
     if (!ok) return;
@@ -273,9 +238,16 @@ function Dashboard({
   };
 
   return (
-    <section className="min-h-screen pb-28">
-      <header className="rounded-b-[2rem] bg-forest px-6 pt-12 pb-8 shadow-luxe">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+    <section className="min-h-dvh pb-28">
+      <header className="rounded-b-[2rem] bg-forest px-6 pt-10 pb-8 shadow-luxe">
+        <button
+          onClick={onSignOut}
+          className="flex items-center gap-1.5 rounded-xl bg-primary-foreground/10 px-3 py-2 text-xs font-semibold text-primary-foreground active:scale-95"
+        >
+          <ArrowRight className="h-4 w-4" /> رجوع إلى مزارعي
+        </button>
+
+        <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
           <div className="min-w-0">
             <p className="text-xs tracking-widest text-primary-foreground/60">
               {accountName || t("myFarmLabel")}
@@ -290,13 +262,6 @@ function Dashboard({
               className="grid h-11 w-11 place-items-center rounded-2xl bg-primary-foreground/10 text-primary-foreground active:scale-95"
             >
               <Tractor className="h-5 w-5" strokeWidth={1.9} />
-            </button>
-            <button
-              onClick={() => setHidden((v) => !v)}
-              aria-label={hidden ? t("showNumbers") : t("hideNumbers")}
-              className="grid h-11 w-11 place-items-center rounded-2xl bg-primary-foreground/10 text-primary-foreground active:scale-95"
-            >
-              {hidden ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             </button>
             <button
               onClick={() => setSettingsOpen(true)}
@@ -335,64 +300,7 @@ function Dashboard({
           </p>
         )}
 
-        {tab === "ledger" && page === "eggs" && (
-          <EggSalesPage
-            farmId={farm.id}
-            currencySymbol={symbol}
-            onBack={() => setPage("home")}
-          />
-        )}
-        {tab === "ledger" && page === "feed" && (
-          <FeedLogPage farmId={farm.id} currencySymbol={symbol} onBack={() => setPage("home")} />
-        )}
-
-        {tab === "ledger" && page === "home" && (
-          <div className="space-y-4">
-            <DailyAlertBanner kind={POULTRY} online={online} weather={weather} />
-
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard
-                title={t("income")}
-                value={hidden ? "••••" : `${income.toLocaleString("ar-EG")} ${symbol}`}
-                hint={t("thisMonth")}
-              />
-              <StatCard
-                title={t("expenses")}
-                value={hidden ? "••••" : `${expenses.toLocaleString("ar-EG")} ${symbol}`}
-                hint={t("thisMonth")}
-              />
-            </div>
-
-            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-              <WeatherWidget weather={weather} cached={cached} label={t("weatherToday")} />
-              <div className="px-5 py-4">
-                <p className="text-xs font-bold tracking-widest text-gold">{t("todayAlert")}</p>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  {weather
-                    ? (weatherAlert(POULTRY, weather)?.body ?? "")
-                    : "حافظ على التهوية وتوفر ماء نظيف بشكل دائم، وراقب أي أعراض غير طبيعية."}
-                </p>
-              </div>
-            </div>
-
-            <PoultryCards
-              farmId={farm.id}
-              currencySymbol={symbol}
-              onOpenEggs={() => setPage("eggs")}
-              onOpenFeed={() => setPage("feed")}
-            />
-
-            <Ledger farmId={farm.id} farmKind={POULTRY} currencySymbol={symbol} />
-
-            <Panel title={t("todayActivity")}>
-              {activity.length === 0 ? (
-                <p className="py-2 text-sm text-muted-foreground">{t("noActivity")}</p>
-              ) : (
-                activity.map((a) => <Row key={a.id} label={a.label} value={a.value} />)
-              )}
-            </Panel>
-          </div>
-        )}
+        {tab === "ledger" && <TraderLedger farmId={farm.id} currencySymbol={symbol} />}
 
         {tab === "flocks" && <Flocks farmId={farm.id} />}
 
@@ -410,16 +318,6 @@ function Dashboard({
             <Paywall onActivate={subscription.activate} />
           ))}
       </div>
-
-      {tab === "ledger" && page === "home" && (
-        <button
-          onClick={() => setQuickOpen(true)}
-          aria-label="إضافة سريعة"
-          className="fixed bottom-24 left-5 z-30 grid h-14 w-14 place-items-center rounded-2xl bg-goldish text-accent-foreground shadow-goldish active:scale-95 sm:left-[calc(50%-11rem)]"
-        >
-          <Plus className="h-7 w-7" strokeWidth={2.2} />
-        </button>
-      )}
 
       <nav className="fixed bottom-0 left-1/2 z-20 w-full max-w-md -translate-x-1/2 border-t border-border bg-card/95 px-3 py-2 backdrop-blur">
         <ul className="grid grid-cols-4">
@@ -476,41 +374,6 @@ function Dashboard({
         onExportData={exportData}
         onClearData={clearData}
       />
-
-      <QuickAddSheet
-        open={quickOpen}
-        onClose={() => setQuickOpen(false)}
-        currencySymbol={symbol}
-        onSave={handleQuickSave}
-      />
     </section>
-  );
-}
-
-function StatCard({ title, value, hint }: { title: string; value: string; hint: string }) {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-      <p className="text-xs text-muted-foreground">{title}</p>
-      <p className="mt-2 text-xl font-bold text-primary">{value}</p>
-      <p className="mt-1 text-[11px] text-gold">{hint}</p>
-    </div>
-  );
-}
-
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <h2 className="text-base font-bold text-primary">{title}</h2>
-      <div className="mt-4 space-y-3">{children}</div>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-3 last:border-0 last:pb-0">
-      <span className="min-w-0 truncate text-sm text-foreground">{label}</span>
-      <span className="shrink-0 text-sm font-semibold text-primary">{value}</span>
-    </div>
   );
 }

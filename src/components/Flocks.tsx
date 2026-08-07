@@ -58,13 +58,19 @@ export function Flocks({ farmId }: { farmId: string }) {
   };
 
   const save = () => {
-    if (draft.name.trim().length < 2) return;
-    const clean = { ...draft, name: draft.name.trim() };
+    const name = draft.name.trim() || `فوج ${arNum(flocks.length + 1)}`;
+    const clean: Flock = {
+      ...draft,
+      name,
+      startDate: draft.startDate || today(),
+      saleDate: draft.saleDate || toISO(addMonths(new Date(draft.startDate || today()), 24)),
+    };
     setFlocks((prev) =>
       clean.id
         ? prev.map((f) => (f.id === clean.id ? clean : f))
         : [{ ...clean, id: uid() }, ...prev],
     );
+    setDraft(emptyDraft());
     setOpen(false);
   };
 
@@ -75,9 +81,7 @@ export function Flocks({ farmId }: { farmId: string }) {
 
   const addDeath = (id: string, n: number) =>
     setFlocks((prev) =>
-      prev.map((f) =>
-        f.id === id ? { ...f, deaths: String(Math.max(0, num(f.deaths) + n)) } : f,
-      ),
+      prev.map((f) => (f.id === id ? { ...f, deaths: String(Math.max(0, num(f.deaths) + n)) } : f)),
     );
 
   const totalBirds = flocks.reduce((s, f) => s + Math.max(0, num(f.count) - num(f.deaths)), 0);

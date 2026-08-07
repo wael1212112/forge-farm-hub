@@ -266,18 +266,17 @@ function AccountStatement({
   const removeEntry = (id: string) =>
     onChange({ entries: entries.filter((e) => e.id !== id) });
 
-  /** الكتابة في السطر الفارغ الأخير تُنشئ حركة جديدة فوراً ثم تُفرغ السطر (Excel-style) */
+  /** يبقى السطر الأخير مسودّة حتى يُدخل المستخدم مبلغاً، فيُثبَّت كحركة ويُفتح سطر جديد */
   const editNewRow = (patch: Partial<LedgerEntry>) => {
     const merged = { ...newRow, ...patch };
-    const filled =
-      merged.details.trim() !== "" || num(merged.amount) > 0 || num(merged.qty) > 0;
-    if (filled) {
+    if (num(merged.amount) > 0 || num(merged.qty) * num(merged.unitPrice) > 0) {
       onChange({ entries: [...entries, { ...merged, id: uid(), date: merged.date || today() }] });
       setNewRow(emptyEntry());
     } else {
       setNewRow(merged);
     }
   };
+
 
   const dates = entries
     .map((e) => new Date(e.date).getTime())

@@ -300,7 +300,7 @@ function Dashboard({
           </p>
         )}
 
-        {tab === "ledger" && <TraderLedger farmId={farm.id} currencySymbol={symbol} />}
+        {tab === "ledger" && <TraderLedger farmId={farm.id} currencySymbol={symbol} farmName={farm.name} />}
 
         {tab === "flocks" && <Flocks farmId={farm.id} />}
 

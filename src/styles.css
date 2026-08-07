@@ -239,4 +239,25 @@
   }
 }
 
+/* خلية جدول قابلة للتحرير مباشرة (نمط Excel) */
+@utility cell-input {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  background-color: transparent;
+  padding: 0.5rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-foreground);
+  outline: none;
+
+  &:hover {
+    border-color: var(--color-border);
+  }
+
+  &:focus {
+    background-color: var(--color-card);
+    border-color: var(--gold, var(--color-primary));
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--gold, var(--color-primary)) 18%, transparent);
+  }
+}
 

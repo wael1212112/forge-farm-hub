@@ -1,5 +1,17 @@
 import { useMemo, useState } from "react";
-import { ArrowRight, Plus, Trash2, Pencil, Phone, X, BookUser, Check } from "lucide-react";
+import {
+  ArrowRight,
+  Plus,
+  Trash2,
+  Pencil,
+  Phone,
+  X,
+  BookUser,
+  Check,
+  FileDown,
+  Share2,
+} from "lucide-react";
+
 import { usePersistentState } from "@/lib/persist";
 import { uid, today, num, arNum, arDate } from "@/lib/poultry";
 
@@ -65,9 +77,11 @@ function balanceLabel(v: number, symbol: string) {
 export function TraderLedger({
   farmId,
   currencySymbol,
+  farmName = "مزرعة دواجن",
 }: {
   farmId: string;
   currencySymbol: string;
+  farmName?: string;
 }) {
   const [accounts, setAccounts, loaded] = usePersistentState<LedgerAccount[]>(
     `agripulse_accounts_${farmId}`,
@@ -106,6 +120,7 @@ export function TraderLedger({
       <AccountStatement
         account={opened}
         currencySymbol={currencySymbol}
+        farmName={farmName}
         onBack={() => setOpenId(null)}
         onChange={(patch) => updateAccount(opened.id, patch)}
         onEdit={() => setForm({ ...emptyAccount(), ...opened })}
@@ -216,6 +231,7 @@ export function TraderLedger({
 function AccountStatement({
   account,
   currencySymbol,
+  farmName,
   onBack,
   onChange,
   onEdit,
@@ -223,48 +239,87 @@ function AccountStatement({
 }: {
   account: LedgerAccount;
   currencySymbol: string;
+  farmName: string;
   onBack: () => void;
   onChange: (patch: Partial<LedgerAccount>) => void;
   onEdit: () => void;
   editor: React.ReactNode;
 }) {
-  const [draft, setDraft] = useState<LedgerEntry | null>(null);
+  const [newRow, setNewRow] = useState<LedgerEntry>(() => emptyEntry());
+  const [busy, setBusy] = useState<"pdf" | "share" | null>(null);
+
+  const entries = account.entries ?? [];
 
   const rows = useMemo(() => {
-    const sorted = [...(account.entries ?? [])].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-    );
     let running = num(account.opening);
-    return sorted.map((e) => {
+    return entries.map((e) => {
       running += e.type === "credit" ? num(e.amount) : -num(e.amount);
       return { entry: e, running };
     });
-  }, [account.entries, account.opening]);
+  }, [entries, account.opening]);
 
   const final = balanceOf(account);
 
-  const saveEntry = () => {
-    if (!draft) return;
-    const amount = num(draft.amount) || num(draft.qty) * num(draft.unitPrice);
-    if (amount <= 0) return;
-    const clean: LedgerEntry = {
-      ...draft,
-      amount: String(amount),
-      details: draft.details.trim(),
-      date: draft.date || today(),
-    };
-    const entries = account.entries ?? [];
-    onChange({
-      entries: clean.id
-        ? entries.map((e) => (e.id === clean.id ? clean : e))
-        : [...entries, { ...clean, id: uid() }],
-    });
-    setDraft(null);
+  const patchEntry = (id: string, patch: Partial<LedgerEntry>) =>
+    onChange({ entries: entries.map((e) => (e.id === id ? { ...e, ...patch } : e)) });
+
+  const removeEntry = (id: string) =>
+    onChange({ entries: entries.filter((e) => e.id !== id) });
+
+  /** يبقى السطر الأخير مسودّة حتى يُدخل المستخدم مبلغاً، فيُثبَّت كحركة ويُفتح سطر جديد */
+  const editNewRow = (patch: Partial<LedgerEntry>) => {
+    const merged = { ...newRow, ...patch };
+    if (num(merged.amount) > 0 || num(merged.qty) * num(merged.unitPrice) > 0) {
+      onChange({ entries: [...entries, { ...merged, id: uid(), date: merged.date || today() }] });
+      setNewRow(emptyEntry());
+    } else {
+      setNewRow(merged);
+    }
   };
 
-  const removeEntry = (id: string) => {
-    if (!window.confirm("حذف هذه الحركة من كشف الحساب؟")) return;
-    onChange({ entries: (account.entries ?? []).filter((e) => e.id !== id) });
+
+  const dates = entries
+    .map((e) => new Date(e.date).getTime())
+    .filter((t) => !isNaN(t))
+    .sort((a, b) => a - b);
+  const rangeLabel =
+    dates.length > 0
+      ? `من تاريخ ${arDate(new Date(dates[0]!).toISOString().slice(0, 10))} إلى تاريخ ${arDate(
+          new Date(dates[dates.length - 1]!).toISOString().slice(0, 10),
+        )}`
+      : `بتاريخ ${arDate(today())}`;
+
+  const pdfPayload = () => ({
+    traderName: account.name,
+    role: account.role,
+    phone: account.phone,
+    farmName,
+    rangeLabel,
+    rows: rows.map(({ entry, running }) => ({
+      date: arDate(entry.date),
+      details: entry.details || (entry.type === "credit" ? "مبيع" : "قبض"),
+      credit: entry.type === "credit" ? `${arNum(entry.amount)} ${currencySymbol}` : "—",
+      debit: entry.type === "debit" ? `${arNum(entry.amount)} ${currencySymbol}` : "—",
+      balance: `${arNum(Math.abs(running))} ${running < 0 ? "عليه" : "له"}`,
+    })),
+    finalLabel: balanceLabel(final, currencySymbol),
+    fileName: `كشف-حساب-${account.name.replace(/\s+/g, "-")}`,
+  });
+
+  const doExport = async (mode: "pdf" | "share") => {
+    if (busy) return;
+    setBusy(mode);
+    try {
+      const { downloadStatementPdf, shareStatementPdf } = await import("@/lib/pdf");
+      const data = pdfPayload();
+      if (mode === "pdf") await downloadStatementPdf(data);
+      else await shareStatementPdf(data);
+    } catch (err) {
+      console.error("pdf-export-failed", err);
+      window.alert("تعذّر إنشاء ملف PDF — أعد المحاولة.");
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (
@@ -303,79 +358,141 @@ function AccountStatement({
         </p>
       </div>
 
-      <button
-        onClick={() => setDraft(emptyEntry())}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-goldish py-3.5 text-sm font-bold text-accent-foreground shadow-goldish active:scale-[0.98]"
-      >
-        <Plus className="h-4 w-4" /> إضافة حركة جديدة
-      </button>
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={() => doExport("pdf")}
+          disabled={busy !== null}
+          className="flex items-center justify-center gap-2 rounded-2xl bg-goldish py-3.5 text-sm font-bold text-accent-foreground shadow-goldish active:scale-[0.97] disabled:opacity-60"
+        >
+          <FileDown className="h-4 w-4" /> {busy === "pdf" ? "جارٍ التصدير..." : "تصدير PDF"}
+        </button>
+        <button
+          onClick={() => doExport("share")}
+          disabled={busy !== null}
+          className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3.5 text-sm font-bold text-primary active:scale-[0.97] disabled:opacity-60"
+        >
+          <Share2 className="h-4 w-4" /> {busy === "share" ? "جارٍ التحضير..." : "مشاركة الكشف"}
+        </button>
+      </div>
+
+      <p className="rounded-2xl border border-dashed border-border px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
+        اكتب مباشرة داخل خلايا الجدول — يُضاف سطر جديد تلقائياً في الأسفل، ويُحدَّث الرصيد التراكمي
+        لحظياً.
+      </p>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[34rem] text-right text-xs">
+          <table className="w-full min-w-[38rem] text-right text-xs">
             <thead className="bg-secondary/70 text-[11px] text-muted-foreground">
               <tr>
-                <th className="px-3 py-2.5 font-semibold">التاريخ</th>
-                <th className="px-3 py-2.5 font-semibold">التفاصيل</th>
-                <th className="px-3 py-2.5 font-semibold">له (مبيع)</th>
-                <th className="px-3 py-2.5 font-semibold">عليه (قبض)</th>
-                <th className="px-3 py-2.5 font-semibold">الرصيد</th>
-                <th className="px-3 py-2.5" />
+                <th className="px-2 py-2.5 font-semibold">التاريخ</th>
+                <th className="px-2 py-2.5 font-semibold">التفاصيل</th>
+                <th className="px-2 py-2.5 font-semibold">له (مبيع)</th>
+                <th className="px-2 py-2.5 font-semibold">عليه (قبض)</th>
+                <th className="px-2 py-2.5 font-semibold">الرصيد</th>
+                <th className="px-1 py-2.5" />
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
-                    لا توجد حركات بعد.
+              {rows.map(({ entry, running }) => (
+                <tr key={entry.id} className="border-t border-border/60">
+                  <td className="px-1 py-1.5">
+                    <input
+                      type="date"
+                      aria-label="تاريخ الحركة"
+                      value={entry.date}
+                      onChange={(e) => patchEntry(entry.id, { date: e.target.value })}
+                      className="cell-input w-[8.5rem]"
+                    />
+                  </td>
+                  <td className="px-1 py-1.5">
+                    <input
+                      aria-label="تفاصيل الحركة"
+                      value={entry.details}
+                      placeholder={entry.type === "credit" ? "مبيع" : "قبض"}
+                      onChange={(e) => patchEntry(entry.id, { details: e.target.value })}
+                      className="cell-input min-w-[7rem]"
+                    />
+                  </td>
+                  <td className="px-1 py-1.5">
+                    <input
+                      aria-label="مبلغ له"
+                      inputMode="decimal"
+                      value={entry.type === "credit" ? entry.amount : ""}
+                      onChange={(e) =>
+                        patchEntry(entry.id, { type: "credit", amount: e.target.value })
+                      }
+                      className="cell-input w-[5.5rem] font-semibold text-primary"
+                    />
+                  </td>
+                  <td className="px-1 py-1.5">
+                    <input
+                      aria-label="مبلغ عليه"
+                      inputMode="decimal"
+                      value={entry.type === "debit" ? entry.amount : ""}
+                      onChange={(e) =>
+                        patchEntry(entry.id, { type: "debit", amount: e.target.value })
+                      }
+                      className="cell-input w-[5.5rem] font-semibold text-destructive"
+                    />
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-3 font-bold text-foreground">
+                    {arNum(Math.abs(running))} {running < 0 ? "عليه" : "له"}
+                  </td>
+                  <td className="px-1 py-1.5">
+                    <button
+                      onClick={() => removeEntry(entry.id)}
+                      aria-label="حذف الحركة"
+                      className="grid h-8 w-8 place-items-center rounded-lg border border-border text-destructive active:scale-90"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </td>
                 </tr>
-              ) : (
-                rows.map(({ entry, running }) => (
-                  <tr key={entry.id} className="border-t border-border/60">
-                    <td className="whitespace-nowrap px-3 py-3 text-muted-foreground">
-                      {arDate(entry.date)}
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className="block font-semibold text-foreground">
-                        {entry.details || (entry.type === "credit" ? "مبيع" : "قبض")}
-                      </span>
-                      {num(entry.qty) > 0 && (
-                        <span className="block text-[10px] text-muted-foreground">
-                          {arNum(entry.qty)} × {arNum(entry.unitPrice)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 font-semibold text-primary">
-                      {entry.type === "credit" ? arNum(entry.amount) : "—"}
-                    </td>
-                    <td className="px-3 py-3 font-semibold text-destructive">
-                      {entry.type === "debit" ? arNum(entry.amount) : "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 font-bold text-foreground">
-                      {arNum(Math.abs(running))} {running < 0 ? "عليه" : "له"}
-                    </td>
-                    <td className="px-2 py-3">
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => setDraft({ ...emptyEntry(), ...entry })}
-                          aria-label="تعديل الحركة"
-                          className="grid h-8 w-8 place-items-center rounded-lg border border-border text-primary active:scale-90"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => removeEntry(entry.id)}
-                          aria-label="حذف الحركة"
-                          className="grid h-8 w-8 place-items-center rounded-lg border border-border text-destructive active:scale-90"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
+
+              <tr className="border-t border-border/60 bg-secondary/30">
+                <td className="px-1 py-1.5">
+                  <input
+                    type="date"
+                    aria-label="تاريخ سطر جديد"
+                    value={newRow.date}
+                    onChange={(e) => setNewRow({ ...newRow, date: e.target.value })}
+                    className="cell-input w-[8.5rem]"
+                  />
+                </td>
+                <td className="px-1 py-1.5">
+                  <input
+                    aria-label="تفاصيل سطر جديد"
+                    value={newRow.details}
+                    placeholder="اكتب هنا لإضافة سطر..."
+                    onChange={(e) => editNewRow({ details: e.target.value })}
+                    className="cell-input min-w-[7rem]"
+                  />
+                </td>
+                <td className="px-1 py-1.5">
+                  <input
+                    aria-label="مبلغ له سطر جديد"
+                    inputMode="decimal"
+                    value={newRow.type === "credit" ? newRow.amount : ""}
+                    onChange={(e) => editNewRow({ type: "credit", amount: e.target.value })}
+                    className="cell-input w-[5.5rem] font-semibold text-primary"
+                  />
+                </td>
+                <td className="px-1 py-1.5">
+                  <input
+                    aria-label="مبلغ عليه سطر جديد"
+                    inputMode="decimal"
+                    value={newRow.type === "debit" ? newRow.amount : ""}
+                    onChange={(e) => editNewRow({ type: "debit", amount: e.target.value })}
+                    className="cell-input w-[5.5rem] font-semibold text-destructive"
+                  />
+                </td>
+                <td className="px-2 py-3 text-muted-foreground">—</td>
+                <td className="px-1 py-1.5">
+                  <Plus className="mx-auto h-3.5 w-3.5 text-muted-foreground" />
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -392,95 +509,11 @@ function AccountStatement({
         </div>
       </div>
 
-      {draft && (
-        <Sheet
-          title={draft.id ? "✏️ تعديل الحركة" : "➕ حركة جديدة"}
-          onClose={() => setDraft(null)}
-        >
-          <Field label="التاريخ">
-            <input
-              type="date"
-              value={draft.date}
-              onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-              className="input-luxe"
-            />
-          </Field>
-
-          <p className="mt-4 text-sm font-semibold text-primary">نوع الحركة</p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {(
-              [
-                { id: "credit", label: "مبيع / له (+)" },
-                { id: "debit", label: "قبض / دفعة (−)" },
-              ] as const
-            ).map((o) => (
-              <button
-                key={o.id}
-                onClick={() => setDraft({ ...draft, type: o.id })}
-                className={`rounded-xl border px-3 py-3 text-xs font-bold ${
-                  draft.type === o.id
-                    ? "border-gold bg-secondary text-primary"
-                    : "border-border bg-card text-foreground"
-                }`}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-
-          <Field label="التفاصيل / البيان">
-            <input
-              value={draft.details}
-              onChange={(e) => setDraft({ ...draft, details: e.target.value })}
-              placeholder="مثال: ٢٠ طبق بيض، دفعة نقدية..."
-              className="input-luxe"
-            />
-          </Field>
-
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="block text-[11px] text-muted-foreground">الكمية</span>
-              <input
-                value={draft.qty}
-                inputMode="decimal"
-                onChange={(e) => setDraft({ ...draft, qty: e.target.value })}
-                className="input-luxe mt-1"
-              />
-            </label>
-            <label className="block">
-              <span className="block text-[11px] text-muted-foreground">سعر الوحدة</span>
-              <input
-                value={draft.unitPrice}
-                inputMode="decimal"
-                onChange={(e) => setDraft({ ...draft, unitPrice: e.target.value })}
-                className="input-luxe mt-1"
-              />
-            </label>
-          </div>
-
-          <Field label="المبلغ (يُحسب تلقائياً إن تركته فارغاً)">
-            <input
-              value={draft.amount}
-              inputMode="decimal"
-              onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
-              placeholder={String(num(draft.qty) * num(draft.unitPrice) || "")}
-              className="input-luxe"
-            />
-          </Field>
-
-          <button
-            onClick={saveEntry}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-forest py-3.5 text-sm font-bold text-primary-foreground shadow-luxe active:scale-[0.97]"
-          >
-            <Check className="h-4 w-4" /> حفظ الحركة
-          </button>
-        </Sheet>
-      )}
-
       {editor}
     </div>
   );
 }
+
 
 /* ------------------------------ نموذج الحساب ------------------------------ */
 

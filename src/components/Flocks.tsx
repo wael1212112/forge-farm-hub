@@ -58,15 +58,22 @@ export function Flocks({ farmId }: { farmId: string }) {
   };
 
   const save = () => {
-    if (draft.name.trim().length < 2) return;
-    const clean = { ...draft, name: draft.name.trim() };
+    const name = draft.name.trim() || `فوج ${arNum(flocks.length + 1)}`;
+    const clean: Flock = {
+      ...draft,
+      name,
+      startDate: draft.startDate || today(),
+      saleDate: draft.saleDate || toISO(addMonths(new Date(draft.startDate || today()), 24)),
+    };
     setFlocks((prev) =>
       clean.id
         ? prev.map((f) => (f.id === clean.id ? clean : f))
         : [{ ...clean, id: uid() }, ...prev],
     );
+    setDraft(emptyDraft());
     setOpen(false);
   };
+
 
   const remove = (id: string) => {
     if (!window.confirm("سيتم حذف هذا الفوج نهائياً. متابعة؟")) return;

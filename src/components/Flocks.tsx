@@ -74,7 +74,6 @@ export function Flocks({ farmId }: { farmId: string }) {
     setOpen(false);
   };
 
-
   const remove = (id: string) => {
     if (!window.confirm("سيتم حذف هذا الفوج نهائياً. متابعة؟")) return;
     setFlocks((prev) => prev.filter((f) => f.id !== id));
@@ -82,9 +81,7 @@ export function Flocks({ farmId }: { farmId: string }) {
 
   const addDeath = (id: string, n: number) =>
     setFlocks((prev) =>
-      prev.map((f) =>
-        f.id === id ? { ...f, deaths: String(Math.max(0, num(f.deaths) + n)) } : f,
-      ),
+      prev.map((f) => (f.id === id ? { ...f, deaths: String(Math.max(0, num(f.deaths) + n)) } : f)),
     );
 
   const totalBirds = flocks.reduce((s, f) => s + Math.max(0, num(f.count) - num(f.deaths)), 0);

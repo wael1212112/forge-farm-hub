@@ -1,14 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  ArrowRight,
-  Plus,
-  Trash2,
-  Pencil,
-  Phone,
-  X,
-  BookUser,
-  Check,
-} from "lucide-react";
+import { ArrowRight, Plus, Trash2, Pencil, Phone, X, BookUser, Check } from "lucide-react";
 import { usePersistentState } from "@/lib/persist";
 import { uid, today, num, arNum, arDate } from "@/lib/poultry";
 
@@ -177,7 +168,11 @@ export function TraderLedger({
                     </span>
                     <span
                       className={`mt-2 block text-sm font-bold ${
-                        bal > 0 ? "text-primary" : bal < 0 ? "text-destructive" : "text-muted-foreground"
+                        bal > 0
+                          ? "text-primary"
+                          : bal < 0
+                            ? "text-destructive"
+                            : "text-muted-foreground"
                       }`}
                     >
                       {balanceLabel(bal, currencySymbol)}
@@ -398,7 +393,10 @@ function AccountStatement({
       </div>
 
       {draft && (
-        <Sheet title={draft.id ? "✏️ تعديل الحركة" : "➕ حركة جديدة"} onClose={() => setDraft(null)}>
+        <Sheet
+          title={draft.id ? "✏️ تعديل الحركة" : "➕ حركة جديدة"}
+          onClose={() => setDraft(null)}
+        >
           <Field label="التاريخ">
             <input
               type="date"

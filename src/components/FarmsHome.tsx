@@ -33,7 +33,6 @@ export function WelcomeScreen({ onStart }: { onStart: () => void }) {
   );
 }
 
-
 /** قائمة المزارع — إضافة، تعديل، حذف، ودخول */
 export function FarmsScreen({
   farms,

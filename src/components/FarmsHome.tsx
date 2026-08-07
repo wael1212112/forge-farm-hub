@@ -1,52 +1,38 @@
 import { useState } from "react";
-import { Leaf, Plus, Trash2, Pencil, ArrowLeft, Check, X } from "lucide-react";
+import { Plus, Trash2, Pencil, ArrowLeft, Check, X, Bird } from "lucide-react";
 import type { Farm } from "./SettingsSheet";
 
-/** شاشة الترحيب الأولى — بدون تسجيل دخول أو رموز */
+/** شاشة الترحيب — بسيطة، أنيقة، ومتحركة (بدون تسجيل دخول أو رمز) */
 export function WelcomeScreen({ onStart }: { onStart: () => void }) {
   return (
     <section
       dir="rtl"
-      className="animate-rise flex min-h-screen flex-col justify-center bg-forest px-7 py-12"
+      className="flex min-h-dvh flex-col items-center justify-center bg-forest px-8 py-16 text-center"
     >
-      <div className="flex flex-col items-center text-center">
-        <span className="grid h-20 w-20 place-items-center rounded-3xl bg-goldish shadow-goldish">
-          <Leaf className="h-9 w-9 text-accent-foreground" strokeWidth={1.8} />
+      <div className="relative grid place-items-center">
+        <span className="animate-halo absolute h-24 w-24 rounded-full border border-gold/50" />
+        <span className="animate-logo grid h-24 w-24 place-items-center rounded-[2rem] bg-goldish shadow-goldish">
+          <Bird className="h-11 w-11 text-accent-foreground" strokeWidth={1.7} />
         </span>
-        <h1 className="mt-6 text-3xl font-bold text-primary-foreground">
-          Agri<span className="text-gold">Pulse</span>
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-primary-foreground/70">
-          مرحباً بك 👋 — تطبيق إدارة مزارع الدواجن: كشوفات حسابات تراكمية، متابعة الأفواج بالأشهر
-          والأسابيع، الأدوية، والمستشار الذكي.
-        </p>
       </div>
 
-      <ul className="mt-10 space-y-3">
-        {[
-          "🐓 أضف عدة مزارع وتنقّل بينها بسهولة",
-          "📊 كشف حساب تراكمي لكل تاجر مع الرصيد السابق",
-          "🐣 عمر الفوج والمدة المتبقية للبيع تُحسب تلقائياً",
-          "📴 كل البيانات محفوظة على جهازك وتعمل بدون إنترنت",
-        ].map((line) => (
-          <li
-            key={line}
-            className="rounded-2xl border border-primary-foreground/10 bg-primary-foreground/5 px-4 py-3 text-sm text-primary-foreground/85"
-          >
-            {line}
-          </li>
-        ))}
-      </ul>
+      <h1 className="animate-rise mt-8 text-4xl font-bold tracking-tight text-primary-foreground">
+        Agri<span className="text-gold">Pulse</span>
+      </h1>
+      <p className="animate-rise mt-3 max-w-xs text-sm leading-relaxed text-primary-foreground/70">
+        إدارة مزارع الدواجن — كشوفات حسابات ومتابعة أفواج، بدون إنترنت.
+      </p>
 
       <button
         onClick={onStart}
-        className="mt-10 flex w-full items-center justify-center gap-2 rounded-2xl bg-goldish py-4 text-base font-bold text-accent-foreground shadow-goldish active:scale-[0.97]"
+        className="animate-rise mt-12 flex w-full max-w-xs items-center justify-center gap-2 rounded-2xl bg-goldish py-4 text-base font-bold text-accent-foreground shadow-goldish active:scale-[0.97]"
       >
-        الدخول إلى مزارعي <ArrowLeft className="h-5 w-5" />
+        ابدأ / دخول إلى المزارع <ArrowLeft className="h-5 w-5" />
       </button>
     </section>
   );
 }
+
 
 /** قائمة المزارع — إضافة، تعديل، حذف، ودخول */
 export function FarmsScreen({

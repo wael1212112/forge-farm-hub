@@ -10,6 +10,9 @@ import {
   Check,
   FileDown,
   Share2,
+  Calculator,
+  Copy,
+
 } from "lucide-react";
 
 import { usePersistentState } from "@/lib/persist";

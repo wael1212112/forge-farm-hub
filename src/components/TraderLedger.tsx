@@ -369,9 +369,10 @@ function AccountStatement({
       </div>
 
       <p className="rounded-2xl border border-dashed border-border px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
-        اكتب مباشرة داخل خلايا الجدول — يُضاف سطر جديد تلقائياً في الأسفل، ويُحدَّث الرصيد التراكمي
-        لحظياً.
+        اكتب داخل خلايا الجدول بحرّية — لن يُضاف أي سطر تلقائياً، استخدم زر «إضافة سطر جديد» أسفل
+        الجدول. الرصيد التراكمي يُحدَّث لحظياً.
       </p>
+
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">

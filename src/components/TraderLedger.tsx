@@ -451,51 +451,19 @@ function AccountStatement({
                 </tr>
               ))}
 
-              <tr className="border-t border-border/60 bg-secondary/30">
-                <td className="px-1 py-1.5">
-                  <input
-                    type="date"
-                    aria-label="تاريخ سطر جديد"
-                    value={newRow.date}
-                    onChange={(e) => setNewRow({ ...newRow, date: e.target.value })}
-                    className="cell-input w-[8.5rem]"
-                  />
-                </td>
-                <td className="px-1 py-1.5">
-                  <input
-                    aria-label="تفاصيل سطر جديد"
-                    value={newRow.details}
-                    placeholder="اكتب هنا لإضافة سطر..."
-                    onChange={(e) => editNewRow({ details: e.target.value })}
-                    className="cell-input min-w-[7rem]"
-                  />
-                </td>
-                <td className="px-1 py-1.5">
-                  <input
-                    aria-label="مبلغ له سطر جديد"
-                    inputMode="decimal"
-                    value={newRow.type === "credit" ? newRow.amount : ""}
-                    onChange={(e) => editNewRow({ type: "credit", amount: e.target.value })}
-                    className="cell-input w-[5.5rem] font-semibold text-primary"
-                  />
-                </td>
-                <td className="px-1 py-1.5">
-                  <input
-                    aria-label="مبلغ عليه سطر جديد"
-                    inputMode="decimal"
-                    value={newRow.type === "debit" ? newRow.amount : ""}
-                    onChange={(e) => editNewRow({ type: "debit", amount: e.target.value })}
-                    className="cell-input w-[5.5rem] font-semibold text-destructive"
-                  />
-                </td>
-                <td className="px-2 py-3 text-muted-foreground">—</td>
-                <td className="px-1 py-1.5">
-                  <Plus className="mx-auto h-3.5 w-3.5 text-muted-foreground" />
-                </td>
-              </tr>
             </tbody>
           </table>
         </div>
+
+        <div className="border-t border-border px-3 py-3">
+          <button
+            onClick={addRow}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-gold bg-secondary py-3 text-sm font-bold text-primary active:scale-[0.98]"
+          >
+            <Plus className="h-4 w-4" /> إضافة سطر جديد
+          </button>
+        </div>
+
 
         <div className="border-t border-border bg-secondary/50 px-4 py-4 text-center">
           <p className="text-[11px] text-muted-foreground">الرصيد النهائي</p>

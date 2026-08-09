@@ -471,10 +471,130 @@ function AccountStatement({
         </div>
       </div>
 
+      <button
+        onClick={() => setCalcOpen(true)}
+        aria-label="فتح الآلة الحاسبة"
+        className="fixed bottom-24 left-4 z-40 grid h-14 w-14 place-items-center rounded-2xl bg-forest text-primary-foreground shadow-luxe active:scale-90"
+      >
+        <Calculator className="h-6 w-6" />
+      </button>
+
+      {calcOpen && <CalculatorSheet onClose={() => setCalcOpen(false)} />}
+
       {editor}
     </div>
   );
 }
+
+/* ------------------------------ آلة حاسبة ------------------------------ */
+
+function CalculatorSheet({ onClose }: { onClose: () => void }) {
+  const [expr, setExpr] = useState("");
+  const [result, setResult] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const evaluate = () => {
+    const clean = expr.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[×x]/g, "*").replace(/÷/g, "/");
+    if (!/^[\d+\-*/.() ]+$/.test(clean) || clean.trim() === "") {
+      setResult("خطأ");
+      return;
+    }
+    try {
+      // eslint-disable-next-line no-new-func
+      const v = Function(`"use strict";return (${clean})`)() as number;
+      setResult(Number.isFinite(v) ? String(Math.round(v * 1000) / 1000) : "خطأ");
+    } catch {
+      setResult("خطأ");
+    }
+  };
+
+  const press = (k: string) => {
+    if (k === "=") return evaluate();
+    if (k === "C") {
+      setExpr("");
+      setResult("");
+      return;
+    }
+    if (k === "⌫") {
+      setExpr((p) => p.slice(0, -1));
+      return;
+    }
+    setExpr((p) => p + k);
+  };
+
+  const copy = async () => {
+    const v = result && result !== "خطأ" ? result : expr;
+    if (!v) return;
+    try {
+      await navigator.clipboard.writeText(v);
+    } catch {
+      window.prompt("انسخ الناتج يدوياً:", v);
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  };
+
+  const keys = ["7", "8", "9", "/", "4", "5", "6", "*", "1", "2", "3", "-", "0", ".", "=", "+"];
+
+  return (
+    <Sheet title="🧮 آلة حاسبة" onClose={onClose}>
+      <div className="mt-4 rounded-2xl border border-border bg-card p-4 text-left" dir="ltr">
+        <input
+          value={expr}
+          onChange={(e) => setExpr(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && evaluate()}
+          inputMode="decimal"
+          aria-label="التعبير الحسابي"
+          placeholder="0"
+          className="w-full bg-transparent text-left text-lg font-semibold text-foreground outline-none"
+        />
+        <p className="mt-2 text-2xl font-bold text-primary">{result || "—"}</p>
+      </div>
+
+      <div className="mt-4 grid grid-cols-4 gap-2" dir="ltr">
+        {keys.map((k) => (
+          <button
+            key={k}
+            onClick={() => press(k)}
+            className={`rounded-xl py-4 text-base font-bold active:scale-95 ${
+              k === "="
+                ? "bg-goldish text-accent-foreground"
+                : /[+\-*/]/.test(k)
+                  ? "bg-secondary text-primary"
+                  : "border border-border bg-card text-foreground"
+            }`}
+          >
+            {k}
+          </button>
+        ))}
+        <button
+          onClick={() => press("C")}
+          className="col-span-2 rounded-xl border border-border bg-card py-3 text-sm font-bold text-destructive active:scale-95"
+        >
+          مسح
+        </button>
+        <button
+          onClick={() => press("⌫")}
+          className="col-span-2 rounded-xl border border-border bg-card py-3 text-sm font-bold text-primary active:scale-95"
+        >
+          حذف رقم
+        </button>
+      </div>
+
+      <button
+        onClick={copy}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-forest py-3.5 text-sm font-bold text-primary-foreground shadow-luxe active:scale-[0.97]"
+      >
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        {copied ? "تم النسخ — الصقه في الخلية" : "نسخ الناتج"}
+      </button>
+      <p className="mt-2 text-center text-[11px] text-muted-foreground">
+        انسخ الناتج ثم الصقه مباشرة في أي خلية داخل جدول الحساب.
+      </p>
+    </Sheet>
+  );
+}
+
 
 
 /* ------------------------------ نموذج الحساب ------------------------------ */

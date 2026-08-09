@@ -10,6 +10,9 @@ import {
   Check,
   FileDown,
   Share2,
+  Calculator,
+  Copy,
+
 } from "lucide-react";
 
 import { usePersistentState } from "@/lib/persist";
@@ -245,8 +248,8 @@ function AccountStatement({
   onEdit: () => void;
   editor: React.ReactNode;
 }) {
-  const [newRow, setNewRow] = useState<LedgerEntry>(() => emptyEntry());
   const [busy, setBusy] = useState<"pdf" | "share" | null>(null);
+  const [calcOpen, setCalcOpen] = useState(false);
 
   const entries = account.entries ?? [];
 
@@ -266,16 +269,9 @@ function AccountStatement({
   const removeEntry = (id: string) =>
     onChange({ entries: entries.filter((e) => e.id !== id) });
 
-  /** يبقى السطر الأخير مسودّة حتى يُدخل المستخدم مبلغاً، فيُثبَّت كحركة ويُفتح سطر جديد */
-  const editNewRow = (patch: Partial<LedgerEntry>) => {
-    const merged = { ...newRow, ...patch };
-    if (num(merged.amount) > 0 || num(merged.qty) * num(merged.unitPrice) > 0) {
-      onChange({ entries: [...entries, { ...merged, id: uid(), date: merged.date || today() }] });
-      setNewRow(emptyEntry());
-    } else {
-      setNewRow(merged);
-    }
-  };
+  /** السطر الجديد يُضاف فقط بالزر الصريح — لا توليد تلقائي */
+  const addRow = () => onChange({ entries: [...entries, { ...emptyEntry(), id: uid() }] });
+
 
 
   const dates = entries
@@ -376,9 +372,10 @@ function AccountStatement({
       </div>
 
       <p className="rounded-2xl border border-dashed border-border px-4 py-3 text-[11px] leading-relaxed text-muted-foreground">
-        اكتب مباشرة داخل خلايا الجدول — يُضاف سطر جديد تلقائياً في الأسفل، ويُحدَّث الرصيد التراكمي
-        لحظياً.
+        اكتب داخل خلايا الجدول بحرّية — لن يُضاف أي سطر تلقائياً، استخدم زر «إضافة سطر جديد» أسفل
+        الجدول. الرصيد التراكمي يُحدَّث لحظياً.
       </p>
+
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
@@ -451,51 +448,19 @@ function AccountStatement({
                 </tr>
               ))}
 
-              <tr className="border-t border-border/60 bg-secondary/30">
-                <td className="px-1 py-1.5">
-                  <input
-                    type="date"
-                    aria-label="تاريخ سطر جديد"
-                    value={newRow.date}
-                    onChange={(e) => setNewRow({ ...newRow, date: e.target.value })}
-                    className="cell-input w-[8.5rem]"
-                  />
-                </td>
-                <td className="px-1 py-1.5">
-                  <input
-                    aria-label="تفاصيل سطر جديد"
-                    value={newRow.details}
-                    placeholder="اكتب هنا لإضافة سطر..."
-                    onChange={(e) => editNewRow({ details: e.target.value })}
-                    className="cell-input min-w-[7rem]"
-                  />
-                </td>
-                <td className="px-1 py-1.5">
-                  <input
-                    aria-label="مبلغ له سطر جديد"
-                    inputMode="decimal"
-                    value={newRow.type === "credit" ? newRow.amount : ""}
-                    onChange={(e) => editNewRow({ type: "credit", amount: e.target.value })}
-                    className="cell-input w-[5.5rem] font-semibold text-primary"
-                  />
-                </td>
-                <td className="px-1 py-1.5">
-                  <input
-                    aria-label="مبلغ عليه سطر جديد"
-                    inputMode="decimal"
-                    value={newRow.type === "debit" ? newRow.amount : ""}
-                    onChange={(e) => editNewRow({ type: "debit", amount: e.target.value })}
-                    className="cell-input w-[5.5rem] font-semibold text-destructive"
-                  />
-                </td>
-                <td className="px-2 py-3 text-muted-foreground">—</td>
-                <td className="px-1 py-1.5">
-                  <Plus className="mx-auto h-3.5 w-3.5 text-muted-foreground" />
-                </td>
-              </tr>
             </tbody>
           </table>
         </div>
+
+        <div className="border-t border-border px-3 py-3">
+          <button
+            onClick={addRow}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-gold bg-secondary py-3 text-sm font-bold text-primary active:scale-[0.98]"
+          >
+            <Plus className="h-4 w-4" /> إضافة سطر جديد
+          </button>
+        </div>
+
 
         <div className="border-t border-border bg-secondary/50 px-4 py-4 text-center">
           <p className="text-[11px] text-muted-foreground">الرصيد النهائي</p>
@@ -509,10 +474,130 @@ function AccountStatement({
         </div>
       </div>
 
+      <button
+        onClick={() => setCalcOpen(true)}
+        aria-label="فتح الآلة الحاسبة"
+        className="fixed bottom-24 left-4 z-40 grid h-14 w-14 place-items-center rounded-2xl bg-forest text-primary-foreground shadow-luxe active:scale-90"
+      >
+        <Calculator className="h-6 w-6" />
+      </button>
+
+      {calcOpen && <CalculatorSheet onClose={() => setCalcOpen(false)} />}
+
       {editor}
     </div>
   );
 }
+
+/* ------------------------------ آلة حاسبة ------------------------------ */
+
+function CalculatorSheet({ onClose }: { onClose: () => void }) {
+  const [expr, setExpr] = useState("");
+  const [result, setResult] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const evaluate = () => {
+    const clean = expr.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[×x]/g, "*").replace(/÷/g, "/");
+    if (!/^[\d+\-*/.() ]+$/.test(clean) || clean.trim() === "") {
+      setResult("خطأ");
+      return;
+    }
+    try {
+      // eslint-disable-next-line no-new-func
+      const v = Function(`"use strict";return (${clean})`)() as number;
+      setResult(Number.isFinite(v) ? String(Math.round(v * 1000) / 1000) : "خطأ");
+    } catch {
+      setResult("خطأ");
+    }
+  };
+
+  const press = (k: string) => {
+    if (k === "=") return evaluate();
+    if (k === "C") {
+      setExpr("");
+      setResult("");
+      return;
+    }
+    if (k === "⌫") {
+      setExpr((p) => p.slice(0, -1));
+      return;
+    }
+    setExpr((p) => p + k);
+  };
+
+  const copy = async () => {
+    const v = result && result !== "خطأ" ? result : expr;
+    if (!v) return;
+    try {
+      await navigator.clipboard.writeText(v);
+    } catch {
+      window.prompt("انسخ الناتج يدوياً:", v);
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  };
+
+  const keys = ["7", "8", "9", "/", "4", "5", "6", "*", "1", "2", "3", "-", "0", ".", "=", "+"];
+
+  return (
+    <Sheet title="🧮 آلة حاسبة" onClose={onClose}>
+      <div className="mt-4 rounded-2xl border border-border bg-card p-4 text-left" dir="ltr">
+        <input
+          value={expr}
+          onChange={(e) => setExpr(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && evaluate()}
+          inputMode="decimal"
+          aria-label="التعبير الحسابي"
+          placeholder="0"
+          className="w-full bg-transparent text-left text-lg font-semibold text-foreground outline-none"
+        />
+        <p className="mt-2 text-2xl font-bold text-primary">{result || "—"}</p>
+      </div>
+
+      <div className="mt-4 grid grid-cols-4 gap-2" dir="ltr">
+        {keys.map((k) => (
+          <button
+            key={k}
+            onClick={() => press(k)}
+            className={`rounded-xl py-4 text-base font-bold active:scale-95 ${
+              k === "="
+                ? "bg-goldish text-accent-foreground"
+                : /[+\-*/]/.test(k)
+                  ? "bg-secondary text-primary"
+                  : "border border-border bg-card text-foreground"
+            }`}
+          >
+            {k}
+          </button>
+        ))}
+        <button
+          onClick={() => press("C")}
+          className="col-span-2 rounded-xl border border-border bg-card py-3 text-sm font-bold text-destructive active:scale-95"
+        >
+          مسح
+        </button>
+        <button
+          onClick={() => press("⌫")}
+          className="col-span-2 rounded-xl border border-border bg-card py-3 text-sm font-bold text-primary active:scale-95"
+        >
+          حذف رقم
+        </button>
+      </div>
+
+      <button
+        onClick={copy}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-forest py-3.5 text-sm font-bold text-primary-foreground shadow-luxe active:scale-[0.97]"
+      >
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        {copied ? "تم النسخ — الصقه في الخلية" : "نسخ الناتج"}
+      </button>
+      <p className="mt-2 text-center text-[11px] text-muted-foreground">
+        انسخ الناتج ثم الصقه مباشرة في أي خلية داخل جدول الحساب.
+      </p>
+    </Sheet>
+  );
+}
+
 
 
 /* ------------------------------ نموذج الحساب ------------------------------ */

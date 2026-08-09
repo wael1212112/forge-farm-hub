@@ -245,8 +245,8 @@ function AccountStatement({
   onEdit: () => void;
   editor: React.ReactNode;
 }) {
-  const [newRow, setNewRow] = useState<LedgerEntry>(() => emptyEntry());
   const [busy, setBusy] = useState<"pdf" | "share" | null>(null);
+  const [calcOpen, setCalcOpen] = useState(false);
 
   const entries = account.entries ?? [];
 
@@ -266,16 +266,9 @@ function AccountStatement({
   const removeEntry = (id: string) =>
     onChange({ entries: entries.filter((e) => e.id !== id) });
 
-  /** يبقى السطر الأخير مسودّة حتى يُدخل المستخدم مبلغاً، فيُثبَّت كحركة ويُفتح سطر جديد */
-  const editNewRow = (patch: Partial<LedgerEntry>) => {
-    const merged = { ...newRow, ...patch };
-    if (num(merged.amount) > 0 || num(merged.qty) * num(merged.unitPrice) > 0) {
-      onChange({ entries: [...entries, { ...merged, id: uid(), date: merged.date || today() }] });
-      setNewRow(emptyEntry());
-    } else {
-      setNewRow(merged);
-    }
-  };
+  /** السطر الجديد يُضاف فقط بالزر الصريح — لا توليد تلقائي */
+  const addRow = () => onChange({ entries: [...entries, { ...emptyEntry(), id: uid() }] });
+
 
 
   const dates = entries
